@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baseball Pitch Call</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+      background: #f5f5f5;
+      height: 100vh;
+    }
+
+    h1 {
+      margin-bottom: 1rem;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      width: 100%;
+      max-width: 400px;
+      margin-bottom: 2rem;
+    }
+
+    button {
+      padding: 1.2rem;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 12px;
+      background: #0077ff;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #005fcc;
+    }
+
+    button.cancel {
+      background: #cc0000;
+    }
+
+    button.cancel:hover {
+      background: #990000;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pitch Call</h1>
+
+  <div class="button-grid" id="buttonGrid">
+    <!-- Buttons will be populated dynamically -->
+  </div>
+
+  <script>
+    const mainOptions = [
+      { label: 'Fastball', value: 'fastball' },
+      { label: 'Curveball', value: 'curveball' },
+      { label: 'Slider', value: 'slider' },
+      { label: 'Changeup', value: 'changeup' },
+      { label: 'Knuckleball', value: 'knuckleball' },
+      { label: 'Cancel', value: 'cancel', class: 'cancel' }
+    ];
+
+    const subOptions = [
+      { label: 'Inside', value: 'inside' },
+      { label: 'Outside', value: 'outside' },
+      { label: 'High', value: 'high' },
+      { label: 'Low', value: 'low' },
+      { label: '—', value: 'blank' },
+      { label: 'Cancel', value: 'cancel', class: 'cancel' }
+    ];
+
+    const buttonGrid = document.getElementById('buttonGrid');
+    let chosenPitch = null;
+
+    function populateButtons(options, clickHandler) {
+      buttonGrid.innerHTML = '';
+      options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.textContent = opt.label;
+        if (opt.class) btn.classList.add(opt.class);
+        btn.onclick = () => clickHandler(opt.value);
+        buttonGrid.appendChild(btn);
+      });
+    }
+
+    function choosePitch(pitch) {
+      if (pitch === 'cancel') {
+        playCancel();
+        return;
+      }
+      chosenPitch = pitch;
+      populateButtons(subOptions, playSub);
+    }
+
+    function playSub(option) {
+      if (!chosenPitch && option !== 'cancel') return;
+
+      if (option === "blank") {
+        playSequence([`${chosenPitch}.mp3`]);
+      } else if (option === "cancel") {
+        playCancel();
+        return;
+      } else {
+        playSequence([`${chosenPitch}.mp3`, `${option}.mp3`]);
+      }
+
+      // Reset to main options
+      chosenPitch = null;
+      populateButtons(mainOptions, choosePitch);
+    }
+
+    function playCancel() {
+      playSequence(["cancel.mp3"]);
+      chosenPitch = null;
+      populateButtons(mainOptions, choosePitch);
+    }
+
+    function playSequence(files) {
+      let index = 0;
+      const audio = new Audio(files[index]);
+      audio.addEventListener('ended', () => {
+        index++;
+        if (index < files.length) {
+          audio.src = files[index];
+          audio.play();
+        }
+      });
+      audio.play();
+    }
+
+    // Initialize buttons
+    populateButtons(mainOptions, choosePitch);
+  </script>
+</body>
+</html>
