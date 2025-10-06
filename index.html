@@ -1,65 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Baseball Pitch Call</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 1rem;
-      background: #f5f5f5;
-      height: 100vh;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pitch Call</title>
+<style>
+  body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    background: #f5f5f5;
+    /* Remove space-between so footer sits below content */
+    /* height: 100vh; can stay if you want full viewport */
+  }
 
-    h1 {
-      margin-bottom: 1rem;
-    }
+  h1 { 
+    margin-top: 2rem; /* more breathing room from top */
+    margin-bottom: 2rem; /* space between header and buttons */
+    font-size: 2rem;
+  }
 
-    .button-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-      width: 100%;
-      max-width: 400px;
-      margin-bottom: 2rem;
-    }
+  .button-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: 2rem; /* more space between grid and channels */
+  }
 
-    button {
-      padding: 1.2rem;
-      font-size: 1.2rem;
-      border: none;
-      border-radius: 12px;
-      background: #0077ff;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      transition: background 0.2s;
-    }
+  button {
+    padding: 1.5rem; /* a little bigger */
+    font-size: 1.3rem;
+    border: none;
+    border-radius: 12px;
+    background: #0077ff;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: background 0.2s;
+  }
 
-    button:hover {
-      background: #005fcc;
-    }
+  button:hover { background: #005fcc; }
+  button.cancel { background: #cc0000; }
+  button.cancel:hover { background: #990000; }
 
-    button.cancel {
-      background: #cc0000;
-    }
+  .channels {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem; /* extra space below channels */
+  }
 
-    button.cancel:hover {
-      background: #990000;
-    }
-  </style>
+  .channel-btn {
+    background: #ccc;
+    color: #000;
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+    border-radius: 50%;
+    transition: background 0.2s;
+  }
+
+  .channel-btn.selected {
+    background: #0077ff;
+    color: #fff;
+  }
+</style>
+
 </head>
 <body>
   <h1>Pitch Call</h1>
 
-  <div class="button-grid" id="buttonGrid">
-    <!-- Buttons will be populated dynamically -->
-  </div>
+  <div class="button-grid" id="buttonGrid"></div>
+
+  <div class="channels" id="channelButtons"></div>
 
   <script>
     const mainOptions = [
@@ -81,8 +98,26 @@
     ];
 
     const buttonGrid = document.getElementById('buttonGrid');
+    const channelContainer = document.getElementById('channelButtons');
     let chosenPitch = null;
+    let selectedChannel = 1;
 
+    // --- WebSocket ---
+    const ws = new WebSocket("ws://localhost:8080");
+
+    ws.addEventListener("open", () => {
+      console.log("Connected to server");
+    });
+
+    ws.addEventListener("message", (event) => {
+      const data = JSON.parse(event.data);
+      // Only play audio if the message is for the currently selected channel
+      if (data.action === "play" && data.channel === selectedChannel) {
+        playSequence(data.files);
+      }
+    });
+
+    // --- Buttons ---
     function populateButtons(options, clickHandler) {
       buttonGrid.innerHTML = '';
       options.forEach(opt => {
@@ -97,6 +132,7 @@
     function choosePitch(pitch) {
       if (pitch === 'cancel') {
         playCancel();
+        sendPlay(['cancel.mp3']);
         return;
       }
       chosenPitch = pitch;
@@ -106,16 +142,18 @@
     function playSub(option) {
       if (!chosenPitch && option !== 'cancel') return;
 
-      if (option === "blank") {
-        playSequence([`${chosenPitch}.mp3`]);
-      } else if (option === "cancel") {
+      let files = [];
+      if (option === "blank") files = [`${chosenPitch}.mp3`];
+      else if (option === "cancel") {
         playCancel();
+        sendPlay(['cancel.mp3']);
         return;
-      } else {
-        playSequence([`${chosenPitch}.mp3`, `${option}.mp3`]);
       }
+      else files = [`${chosenPitch}.mp3`, `${option}.mp3`];
 
-      // Reset to main options
+      playSequence(files);
+      sendPlay(files);
+
       chosenPitch = null;
       populateButtons(mainOptions, choosePitch);
     }
@@ -139,7 +177,27 @@
       audio.play();
     }
 
-    // Initialize buttons
+    function sendPlay(files) {
+      ws.send(JSON.stringify({ action: 'play', channel: selectedChannel, files }));
+    }
+
+    // --- Channel buttons ---
+    for (let i = 1; i <= 6; i++) {
+      const btn = document.createElement('button');
+      btn.textContent = i;
+      btn.classList.add('channel-btn');
+      if (i === selectedChannel) btn.classList.add('selected');
+
+      btn.onclick = () => {
+        selectedChannel = i;
+        document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        console.log("Selected channel", i);
+      };
+      channelContainer.appendChild(btn);
+    }
+
+    // --- Initialize ---
     populateButtons(mainOptions, choosePitch);
   </script>
 </body>
