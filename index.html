@@ -12,13 +12,11 @@
     align-items: center;
     padding: 1rem;
     background: #f5f5f5;
-    /* Remove space-between so footer sits below content */
-    /* height: 100vh; can stay if you want full viewport */
   }
 
   h1 { 
-    margin-top: 2rem; /* more breathing room from top */
-    margin-bottom: 2rem; /* space between header and buttons */
+    margin-top: 2rem;
+    margin-bottom: 2rem;
     font-size: 2rem;
   }
 
@@ -28,47 +26,60 @@
     gap: 1rem;
     width: 100%;
     max-width: 400px;
-    margin-bottom: 2rem; /* more space between grid and channels */
+    margin-bottom: 2rem;
   }
 
+  /* MAIN BUTTONS (Orange with Black text) */
   button {
-    padding: 1.5rem; /* a little bigger */
+    padding: 1.5rem;
     font-size: 1.3rem;
     border: none;
     border-radius: 12px;
-    background: #0077ff;
-    color: white;
+    background: #ff8800;       /* ORANGE */
+    color: black;              /* BLACK TEXT */
     font-weight: bold;
     cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
     transition: background 0.2s;
   }
 
-  button:hover { background: #005fcc; }
-  button.cancel { background: #cc0000; }
-  button.cancel:hover { background: #990000; }
+  button:hover { background: #cc6d00; }
 
+  /* CANCEL BUTTONS (Black with White text) */
+  button.cancel {
+    background: #000000;
+    color: white;
+  }
+
+  button.cancel:hover {
+    background: #333333;
+  }
+
+  /* CHANNEL BUTTONS (Orange with Black text) */
   .channels {
     display: flex;
     gap: 1rem;
-    margin-bottom: 1rem; /* extra space below channels */
+    margin-bottom: 1rem;
   }
 
   .channel-btn {
-    background: #ccc;
-    color: #000;
+    background: #ff8800;   /* ORANGE */
+    color: black;          /* BLACK TEXT */
     width: 50px;
     height: 50px;
     font-size: 1.2rem;
     border-radius: 50%;
+    font-weight: bold;
     transition: background 0.2s;
   }
 
+  /* SELECTED CHANNEL: Black with Orange text */
   .channel-btn.selected {
-    background: #0077ff;
-    color: #fff;
+    background: #000000;
+    color: #ff8800;
   }
 </style>
+
 
 </head>
 <body>
@@ -129,7 +140,6 @@
       }
     });
 
-    // --- Button Population ---
     function populateButtons(options, clickHandler) {
       buttonGrid.innerHTML = '';
       options.forEach(opt => {
@@ -141,7 +151,6 @@
       });
     }
 
-    // --- Main Option Selection ---
     function choosePitch(option) {
       if (option === 'cancel') {
         playCancel();
@@ -151,7 +160,6 @@
 
       chosenPitch = option;
 
-      // Choose sub-options based on selection
       if (['fastball', 'curveball', 'slider', 'changeup', 'knuckleball'].includes(option)) {
         populateButtons(subPitchOptions, playSub);
       } else if (option === 'throw to' || option === 'fake') {
@@ -159,7 +167,6 @@
       }
     }
 
-    // --- Sub Option Playback ---
     function playSub(option) {
       if (option === 'cancel') {
         playCancel();
@@ -182,7 +189,6 @@
       populateButtons(mainOptions, choosePitch);
     }
 
-    // --- Audio Playback Functions ---
     function playCancel() {
       playSequence(["cancel.mp3"]);
       chosenPitch = null;
@@ -202,12 +208,10 @@
       audio.play();
     }
 
-    // --- Send to Server ---
     function sendPlay(files) {
       ws.send(JSON.stringify({ action: 'play', channel: selectedChannel, files }));
     }
 
-    // --- Channel Buttons ---
     for (let i = 1; i <= 6; i++) {
       const btn = document.createElement('button');
       btn.textContent = i;
@@ -223,7 +227,6 @@
       channelContainer.appendChild(btn);
     }
 
-    // --- Initialize ---
     populateButtons(mainOptions, choosePitch);
   </script>
 </body>
