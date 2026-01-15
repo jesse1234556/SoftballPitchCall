@@ -292,7 +292,7 @@
   let reconnectAttempts = 0;
 
  function connectWebSocket(){
-  const ws = new WebSocket("wss://softballpitchcall.onrender.com"); // assign to global
+  ws = new WebSocket("wss://softballpitchcall.onrender.com"); // assign to global
 
   ws.addEventListener("open", () => {
     console.log("WebSocket OPEN");
