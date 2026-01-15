@@ -78,6 +78,34 @@
     background: #000000;
     color: #ff8800;
   }
+
+  .status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  font-weight: bold;
+}
+
+.status .dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: red;
+}
+
+.status.connected .dot {
+  background: #00c853; /* green */
+}
+
+.status.connected .label {
+  color: #00c853;
+}
+
+.status.disconnected .label {
+  color: red;
+}
+
 </style>
 
 
@@ -89,146 +117,249 @@
 
   <div class="channels" id="channelButtons"></div>
 
-  <script>
-    const mainOptions = [
-      { label: 'Fastball', value: 'fastball' },
-      { label: 'Curveball', value: 'curveball' },
-      { label: 'Slider', value: 'slider' },
-      { label: 'Changeup', value: 'changeup' },
-      { label: 'Knuckleball', value: 'knuckleball' },
-      { label: 'Fake', value: 'fake' },
-      { label: 'Throw To', value: 'throw to' },
-      { label: 'Cancel', value: 'cancel', class: 'cancel' }
-    ];
+  <div id="connectionStatus" class="status">
+  <span class="dot red"></span>
+  <span class="label">Disconnected</span>
+  </div>
 
-    const subPitchOptions = [
-      { label: 'Inside', value: 'inside' },
-      { label: 'Outside', value: 'outside' },
-      { label: 'High', value: 'high' },
-      { label: 'Low', value: 'low' },
-      { label: '—', value: 'blank' },
-      { label: 'Cancel', value: 'cancel', class: 'cancel' }
-    ];
+ <script>
+  /************* GLOBALS *************/
+  const mainOptions = [
+    { label: 'Fastball', value: 'fastball' },
+    { label: 'Curveball', value: 'curveball' },
+    { label: 'Slider', value: 'slider' },
+    { label: 'Changeup', value: 'changeup' },
+    { label: 'Knuckleball', value: 'knuckleball' },
+    { label: 'Fake', value: 'fake' },
+    { label: 'Throw To', value: 'throw to' },
+    { label: 'Cancel', value: 'cancel', class: 'cancel' }
+  ];
 
-    const subThrowFakeOptions = [
-      { label: '1st', value: '1st' },
-      { label: '2nd', value: '2nd' },
-      { label: '3rd', value: '3rd' },
-      { label: 'HOLD', value: 'hold' },
-      { label: 'SS', value: 'ss' },
-      { label: 'PIT', value: 'pit' },
-      { label: '—', value: 'blank' },
-      { label: 'Cancel', value: 'cancel', class: 'cancel' }
-    ];
+  const subPitchOptions = [
+    { label: 'Inside', value: 'inside' },
+    { label: 'Outside', value: 'outside' },
+    { label: 'High', value: 'high' },
+    { label: 'Low', value: 'low' },
+    { label: '—', value: 'blank' },
+    { label: 'Cancel', value: 'cancel', class: 'cancel' }
+  ];
 
-    const buttonGrid = document.getElementById('buttonGrid');
-    const channelContainer = document.getElementById('channelButtons');
-    let chosenPitch = null;
-    let selectedChannel = 1;
+  const subThrowFakeOptions = [
+    { label: '1st', value: '1st' },
+    { label: '2nd', value: '2nd' },
+    { label: '3rd', value: '3rd' },
+    { label: 'HOLD', value: 'hold' },
+    { label: 'SS', value: 'ss' },
+    { label: 'PIT', value: 'pit' },
+    { label: '—', value: 'blank' },
+    { label: 'Cancel', value: 'cancel', class: 'cancel' }
+  ];
 
-    // --- WebSocket ---
-    const ws = new WebSocket("ws://localhost:8080");
+  const buttonGrid = document.getElementById('buttonGrid');
+  const channelContainer = document.getElementById('channelButtons');
+  const statusEl = document.getElementById("connectionStatus");
+  const statusDot = statusEl.querySelector(".dot");
+  const statusLabel = statusEl.querySelector(".label");
 
-    ws.addEventListener("open", () => {
-      console.log("Connected to server");
+  let chosenPitch = null;
+  let selectedChannel = 1;
+
+  /************* AUDIO SETUP *************/
+  let audioUnlocked = false;
+  const audioPlayer = new Audio();
+  audioPlayer.preload = "auto";
+
+  const soundFiles = [
+    "fastball.mp3","curveball.mp3","slider.mp3","changeup.mp3","knuckleball.mp3",
+    "inside.mp3","outside.mp3","high.mp3","low.mp3",
+    "1st.mp3","2nd.mp3","3rd.mp3","hold.mp3","ss.mp3","pit.mp3","cancel.mp3"
+  ];
+
+  // preload all sounds
+  soundFiles.forEach(f => { const a = new Audio(f); a.preload="auto"; });
+
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    const a = new Audio("cancel.mp3");
+    a.play().then(() => { audioUnlocked = true; console.log("🔓 Audio unlocked"); }).catch(()=>{});
+  }
+
+  document.addEventListener("touchstart", unlockAudio, { once: true });
+  document.addEventListener("click", unlockAudio, { once: true });
+
+  function playSequence(files) {
+    if (!audioUnlocked) return;
+
+    let index = 0;
+    audioPlayer.src = files[index];
+    audioPlayer.play().catch(()=>{});
+
+    audioPlayer.onended = () => {
+      index++;
+      if(index < files.length){
+        audioPlayer.src = files[index];
+        audioPlayer.play().catch(()=>{});
+      }
+    };
+  }
+
+  /************* UI BUTTONS *************/
+  function populateButtons(options, clickHandler){
+    buttonGrid.innerHTML = '';
+    options.forEach(opt=>{
+      const btn = document.createElement('button');
+      btn.textContent = opt.label;
+      if(opt.class) btn.classList.add(opt.class);
+      btn.onclick = () => { unlockAudio(); clickHandler(opt.value); };
+      buttonGrid.appendChild(btn);
+    });
+  }
+
+  function choosePitch(option){
+    if(option==='cancel'){
+      playCancel();
+      sendPlay(['cancel.mp3']);
+      return;
+    }
+
+    chosenPitch = option;
+
+    if(['fastball','curveball','slider','changeup','knuckleball'].includes(option)){
+      populateButtons(subPitchOptions, playSub);
+    } else {
+      populateButtons(subThrowFakeOptions, playSub);
+    }
+  }
+
+  function playSub(option){
+    if(option==='cancel'){
+      playCancel();
+      sendPlay(['cancel.mp3']);
+      return;
+    }
+
+    let files = option==='blank' ? [`${chosenPitch}.mp3`] : [`${chosenPitch}.mp3`,`${option}.mp3`];
+    playSequence(files);
+    sendPlay(files);
+    chosenPitch = null;
+    populateButtons(mainOptions, choosePitch);
+  }
+
+  function playCancel(){
+    playSequence(['cancel.mp3']);
+    chosenPitch = null;
+    populateButtons(mainOptions, choosePitch);
+  }
+
+  /************* CHANNELS *************/
+  for(let i=1;i<=6;i++){
+    const btn = document.createElement('button');
+    btn.textContent = i;
+    btn.classList.add('channel-btn');
+    if(i===selectedChannel) btn.classList.add('selected');
+
+    btn.onclick = ()=>{
+      unlockAudio();
+      selectedChannel = i;
+      document.querySelectorAll('.channel-btn').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      console.log("Selected channel", i);
+    };
+
+    channelContainer.appendChild(btn);
+  }
+
+  populateButtons(mainOptions, choosePitch);
+
+  /************* CONNECTION STATUS *************/
+  function setConnected(connected){
+    if(connected){
+      statusEl.classList.add("connected");
+      statusEl.classList.remove("disconnected");
+      statusLabel.textContent = "Connected";
+    } else {
+      statusEl.classList.remove("connected");
+      statusEl.classList.add("disconnected");
+      statusLabel.textContent = "Disconnected";
+    }
+  }
+
+  /************* WEBSOCKET + HEARTBEAT *************/
+  let ws;
+  let heartbeatInterval = null;
+  let lastPong = 0;
+  let reconnectTimer = null;
+  let reconnectAttempts = 0;
+
+  function connectWebSocket(){
+    ws = new WebSocket("ws://localhost:8080");
+
+    ws.addEventListener("open", ()=>{
+      console.log("WebSocket connected");
+      reconnectAttempts = 0;
+      setConnected(true);
+      startHeartbeat();
     });
 
-    ws.addEventListener("message", (event) => {
+    ws.addEventListener("message", (event)=>{
       const data = JSON.parse(event.data);
-      if (data.action === "play" && data.channel === selectedChannel) {
+      if(data.type==='pong'){ lastPong = Date.now(); return; }
+      if(data.action==='play' && data.channel===selectedChannel){
         playSequence(data.files);
       }
     });
 
-    function populateButtons(options, clickHandler) {
-      buttonGrid.innerHTML = '';
-      options.forEach(opt => {
-        const btn = document.createElement('button');
-        btn.textContent = opt.label;
-        if (opt.class) btn.classList.add(opt.class);
-        btn.onclick = () => clickHandler(opt.value);
-        buttonGrid.appendChild(btn);
-      });
-    }
+    ws.addEventListener("close", ()=>{
+      console.warn("WebSocket closed");
+      setConnected(false);
+      stopHeartbeat();
+      scheduleReconnect();
+    });
 
-    function choosePitch(option) {
-      if (option === 'cancel') {
-        playCancel();
-        sendPlay(['cancel.mp3']);
-        return;
+    ws.addEventListener("error", ()=>{
+      console.warn("WebSocket error");
+      setConnected(false);
+      ws.close();
+    });
+  }
+
+  function sendPlay(files){
+    if(ws && ws.readyState===WebSocket.OPEN){
+      ws.send(JSON.stringify({ action:'play', channel:selectedChannel, files }));
+    }
+  }
+
+  function startHeartbeat(){
+    lastPong = Date.now();
+    heartbeatInterval = setInterval(()=>{
+      if(!ws || ws.readyState!==WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type:'ping' }));
+      if(Date.now() - lastPong > 10000){
+        console.warn("Heartbeat timeout");
+        ws.close();
       }
+    },5000);
+  }
 
-      chosenPitch = option;
+  function stopHeartbeat(){
+    if(heartbeatInterval){ clearInterval(heartbeatInterval); heartbeatInterval=null; }
+  }
 
-      if (['fastball', 'curveball', 'slider', 'changeup', 'knuckleball'].includes(option)) {
-        populateButtons(subPitchOptions, playSub);
-      } else if (option === 'throw to' || option === 'fake') {
-        populateButtons(subThrowFakeOptions, playSub);
-      }
-    }
+  function scheduleReconnect(){
+    if(reconnectTimer) return;
+    const delay = Math.min(1000 * 2 ** reconnectAttempts, 10000);
+    console.log(`Reconnecting in ${delay}ms`);
+    reconnectTimer = setTimeout(()=>{
+      reconnectTimer = null;
+      reconnectAttempts++;
+      connectWebSocket();
+    }, delay);
+  }
 
-    function playSub(option) {
-      if (option === 'cancel') {
-        playCancel();
-        sendPlay(['cancel.mp3']);
-        return;
-      }
+  /************* INITIALIZE *************/
+  connectWebSocket();
+</script>
 
-      let files = [];
-
-      if (option === 'blank') {
-        files = [`${chosenPitch}.mp3`];
-      } else {
-        files = [`${chosenPitch}.mp3`, `${option}.mp3`];
-      }
-
-      playSequence(files);
-      sendPlay(files);
-
-      chosenPitch = null;
-      populateButtons(mainOptions, choosePitch);
-    }
-
-    function playCancel() {
-      playSequence(["cancel.mp3"]);
-      chosenPitch = null;
-      populateButtons(mainOptions, choosePitch);
-    }
-
-    function playSequence(files) {
-      let index = 0;
-      const audio = new Audio(files[index]);
-      audio.addEventListener('ended', () => {
-        index++;
-        if (index < files.length) {
-          audio.src = files[index];
-          audio.play();
-        }
-      });
-      audio.play();
-    }
-
-    function sendPlay(files) {
-      ws.send(JSON.stringify({ action: 'play', channel: selectedChannel, files }));
-    }
-
-    for (let i = 1; i <= 6; i++) {
-      const btn = document.createElement('button');
-      btn.textContent = i;
-      btn.classList.add('channel-btn');
-      if (i === selectedChannel) btn.classList.add('selected');
-
-      btn.onclick = () => {
-        selectedChannel = i;
-        document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-        console.log("Selected channel", i);
-      };
-      channelContainer.appendChild(btn);
-    }
-
-    populateButtons(mainOptions, choosePitch);
-  </script>
 </body>
 
 </html>

@@ -1,15 +1,30 @@
 import { WebSocketServer } from "ws";
 
-const wss = new WebSocketServer({ port: 8080 });
+const PORT = 8080;
+const wss = new WebSocketServer({ port: PORT });
+
+console.log(`✅ WebSocket server running on ws://localhost:${PORT}`);
 
 wss.on("connection", (ws) => {
   console.log("Client connected");
 
   ws.on("message", (msg) => {
-    const data = JSON.parse(msg);
+    let data;
+    try {
+      data = JSON.parse(msg);
+    } catch (e) {
+      console.warn("Received invalid JSON:", msg);
+      return;
+    }
 
+    // Heartbeat ping/pong
+    if (data.type === "ping") {
+      ws.send(JSON.stringify({ type: "pong" }));
+      return;
+    }
+
+    // Broadcast play messages to all other clients
     if (data.action === "play" && data.channel) {
-      // Broadcast to all other clients
       wss.clients.forEach((client) => {
         if (client !== ws && client.readyState === 1) {
           client.send(JSON.stringify(data));
@@ -22,6 +37,8 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     console.log("Client disconnected");
   });
-});
 
-console.log("✅ WebSocket server running on ws://localhost:8080");
+  ws.on("error", (err) => {
+    console.error("WebSocket error:", err);
+  });
+});
