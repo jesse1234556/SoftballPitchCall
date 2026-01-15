@@ -131,7 +131,7 @@
     { label: 'Changeup', value: 'changeup' },
     { label: 'Knuckleball', value: 'knuckleball' },
     { label: 'Fake', value: 'fake' },
-    { label: 'Throw To', value: 'throw to' },
+    { label: 'Throw To', value: 'throwto' },
     { label: 'Cancel', value: 'cancel', class: 'cancel' }
   ];
 
@@ -172,7 +172,7 @@
   const soundFiles = [
     "fastball.mp3","curveball.mp3","slider.mp3","changeup.mp3","knuckleball.mp3",
     "inside.mp3","outside.mp3","high.mp3","low.mp3",
-    "1st.mp3","2nd.mp3","3rd.mp3","hold.mp3","ss.mp3","pit.mp3","cancel.mp3"
+    "1st.mp3","2nd.mp3","3rd.mp3","hold.mp3","ss.mp3","pit.mp3","cancel.mp3","silence.mp3"
   ];
 
   // preload all sounds
@@ -180,7 +180,7 @@
 
   function unlockAudio() {
     if (audioUnlocked) return;
-    const a = new Audio("cancel.mp3");
+    const a = new Audio("silence.mp3");
     a.play().then(() => { audioUnlocked = true; console.log("🔓 Audio unlocked"); }).catch(()=>{});
   }
 
@@ -291,37 +291,46 @@
   let reconnectTimer = null;
   let reconnectAttempts = 0;
 
-  function connectWebSocket(){
-     const ws = new WebSocket("wss://softballpitchcall.onrender.com");
+ function connectWebSocket(){
+  const ws = new WebSocket("wss://softballpitchcall.onrender.com"); // assign to global
 
-    ws.addEventListener("open", ()=>{
-      console.log("WebSocket connected");
-      reconnectAttempts = 0;
-      setConnected(true);
-      startHeartbeat();
-    });
+  ws.addEventListener("open", () => {
+    console.log("WebSocket OPEN");
+    reconnectAttempts = 0;
+    setConnected(true);
+    startHeartbeat();
+  });
 
-    ws.addEventListener("message", (event)=>{
-      const data = JSON.parse(event.data);
-      if(data.type==='pong'){ lastPong = Date.now(); return; }
-      if(data.action==='play' && data.channel===selectedChannel){
-        playSequence(data.files);
-      }
-    });
+  ws.addEventListener("close", (e) => {
+    console.warn("WebSocket CLOSED", e.code, e.reason);
+    setConnected(false);
+    stopHeartbeat();
+    scheduleReconnect();
+  });
 
-    ws.addEventListener("close", ()=>{
-      console.warn("WebSocket closed");
-      setConnected(false);
-      stopHeartbeat();
-      scheduleReconnect();
-    });
+  ws.addEventListener("error", (e) => {
+    console.error("WebSocket ERROR", e);
+    setConnected(false);
+    ws.close();
+  });
 
-    ws.addEventListener("error", ()=>{
-      console.warn("WebSocket error");
-      setConnected(false);
-      ws.close();
-    });
-  }
+  ws.addEventListener("message", (event) => {
+    console.log("WebSocket MESSAGE received:", event.data);
+
+    const data = JSON.parse(event.data);
+    if (data.type === 'pong') {
+      lastPong = Date.now();
+      console.log("Pong received from server");
+      return;
+    }
+
+    if (data.action === 'play' && data.channel === selectedChannel) {
+      console.log("Playing audio sequence for files:", data.files);
+      playSequence(data.files);
+    }
+  });
+}
+
 
   function sendPlay(files){
     if(ws && ws.readyState===WebSocket.OPEN){
