@@ -130,9 +130,9 @@
   const mainOptions = [
     { label: 'Fastball', value: 'fastball' },
     { label: 'Curveball', value: 'curveball' },
-    { label: 'Slider', value: 'slider' },
+    { label: 'Drop', value: 'drop' },
     { label: 'Changeup', value: 'changeup' },
-    { label: 'Knuckleball', value: 'knuckleball' },
+    { label: 'Riser', value: 'rise' },
     { label: 'Fake', value: 'fake' },
     { label: 'Throw To', value: 'throwto' },
     { label: 'Cancel', value: 'cancel', class: 'cancel' }
@@ -248,7 +248,7 @@ function choosePitch(option){
   chosenPitch = option;
   inSubMenu = true;
 
-  if(['fastball','curveball','slider','changeup','knuckleball'].includes(option)){
+  if(['fastball','curveball','rise','changeup','drop'].includes(option)){
     populateButtons(subPitchOptions, playSub);
   } else {
     populateButtons(subThrowFakeOptions, playSub);
