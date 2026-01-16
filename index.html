@@ -111,7 +111,10 @@
 
 </head>
 <body>
-  <h1>Pitch Call</h1>
+  <div class="topbar">
+    <h1>EC Goodwin Pitch Call</h1>
+  </div>
+  
 
   <div class="button-grid" id="buttonGrid"></div>
 
@@ -161,6 +164,8 @@
   const statusDot = statusEl.querySelector(".dot");
   const statusLabel = statusEl.querySelector(".label");
 
+  let inSubMenu = false;
+
   let chosenPitch = null;
   let selectedChannel = 1;
 
@@ -204,52 +209,75 @@
   }
 
   /************* UI BUTTONS *************/
-  function populateButtons(options, clickHandler){
-    buttonGrid.innerHTML = '';
-    options.forEach(opt=>{
-      const btn = document.createElement('button');
-      btn.textContent = opt.label;
-      if(opt.class) btn.classList.add(opt.class);
-      btn.onclick = () => { unlockAudio(); clickHandler(opt.value); };
-      buttonGrid.appendChild(btn);
-    });
-  }
+function populateButtons(options, clickHandler){
+  buttonGrid.innerHTML = '';
+  options.forEach(opt=>{
+    const btn = document.createElement('button');
 
-  function choosePitch(option){
-    if(option==='cancel'){
-      playCancel();
-      sendPlay(['cancel.mp3']);
-      return;
-    }
-
-    chosenPitch = option;
-
-    if(['fastball','curveball','slider','changeup','knuckleball'].includes(option)){
-      populateButtons(subPitchOptions, playSub);
+    if (opt.value === 'cancel' && inSubMenu) {
+      btn.textContent = 'Back';
     } else {
-      populateButtons(subThrowFakeOptions, playSub);
+      btn.textContent = opt.label;
     }
+
+    if(opt.class) btn.classList.add(opt.class);
+
+    btn.onclick = () => {
+      unlockAudio();
+
+      // BACK behavior
+      if (opt.value === 'cancel' && inSubMenu) {
+        returnToMainMenu();
+        return;
+      }
+
+      clickHandler(opt.value);
+    };
+
+    buttonGrid.appendChild(btn);
+  });
+}
+
+function choosePitch(option){
+  if(option==='cancel'){
+    playCancel();
+    sendPlay(['cancel.mp3']);
+    return;
   }
+
+  chosenPitch = option;
+  inSubMenu = true;
+
+  if(['fastball','curveball','slider','changeup','knuckleball'].includes(option)){
+    populateButtons(subPitchOptions, playSub);
+  } else {
+    populateButtons(subThrowFakeOptions, playSub);
+  }
+}
+
 
   function playSub(option){
-    if(option==='cancel'){
-      playCancel();
-      sendPlay(['cancel.mp3']);
-      return;
-    }
-
-    let files = option==='blank' ? [`${chosenPitch}.mp3`] : [`${chosenPitch}.mp3`,`${option}.mp3`];
-    playSequence(files);
-    sendPlay(files);
-    chosenPitch = null;
-    populateButtons(mainOptions, choosePitch);
+  if(option === 'cancel'){
+    playCancel();
+    sendPlay(['cancel.mp3']);
+    return;
   }
 
-  function playCancel(){
-    playSequence(['cancel.mp3']);
-    chosenPitch = null;
-    populateButtons(mainOptions, choosePitch);
-  }
+  const files = option === 'blank'
+    ? [`${chosenPitch}.mp3`]
+    : [`${chosenPitch}.mp3`, `${option}.mp3`];
+
+  playSequence(files);
+  sendPlay(files);
+
+  returnToMainMenu();
+}
+
+ function playCancel(){
+  playSequence(['cancel.mp3']);
+  returnToMainMenu();
+}
+
 
   /************* CHANNELS *************/
   for(let i=1;i<=6;i++){
@@ -291,9 +319,16 @@
   let reconnectTimer = null;
   let reconnectAttempts = 0;
 
- function connectWebSocket(){
-  const ws = new WebSocket("wss://softballpitchcall.onrender.com"); // assign to global
+  function returnToMainMenu() {
+  inSubMenu = false;
+  chosenPitch = null;
+  populateButtons(mainOptions, choosePitch);
+}
 
+
+ function connectWebSocket(){
+  //ws = new WebSocket("ws://localhost:8080"); // assign if testing locally
+  ws = new WebSocket("wss://softballpitchcall.onrender.com"); // assign if publishing to github with server
   ws.addEventListener("open", () => {
     console.log("WebSocket OPEN");
     reconnectAttempts = 0;
